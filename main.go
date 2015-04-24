@@ -1,8 +1,16 @@
 package main
 
+// Example usage:
+// sensu-git \
+// -t 60 \
+// -l debug \
+// -r https://github.com/nerdalert/plugin-watch.git \
+// -c etc/sensu/conf.d \
+// -b etc/sensu/conf.d.backups
+
 import (
-	log "github.com/Sirupsen/logrus"
-	"github.com/jessevdk/go-flags"
+	log "github.com/nerdalert/sensu-git/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/nerdalert/sensu-git/Godeps/_workspace/src/github.com/jessevdk/go-flags"
 	"os"
 	"os/signal"
 	"runtime"
@@ -11,16 +19,18 @@ import (
 
 const (
 	defaultInterval    = 90
-	defaultIntervalMin = 30
-	tempDir            = "/tmp/repo"
+	defaultIntervalMin = 20
+	sensuSrvrService   = "sensu-server"
+	tempDir            = "tmp/plugin-watch"
 	defaultSensuPath   = "/etc/sensu/conf.d"
 	defaultBackupPath  = "/etc/sensu/conf.d.backups"
 )
 
+// only daemon mode supported atm. The -d flag is ignored
 var opts struct {
 	GitRepo          string `short:"r" long:"repo" description:"(required) target repository url - example format: https://github.com/nerdalert/plugin-watch.git"`
 	TimeInterval     int    `short:"t" long:"time" description:"(requiredl) time in seconds between Git repository update checks."`
-	CheckConfigPath  string `short:"p" long:"config-path" description:"(recommended: default: [/etc/sensu/conf.d/]) path to the sensu 'check' config files."`
+	CheckConfigPath  string `short:"c" long:"config-path" description:"(recommended: default: [/etc/sensu/conf.d/]) path to the sensu 'check' config files."`
 	ConfigBackupPath string `short:"b" long:"backup-path" description:"(recommended: default: [/etc/sensu/conf.d.backups/]) path to the backup sensu 'check' config files."`
 	Daemon           bool   `short:"d" long:"daemon" description:"(optional:default [true]) run as a daemon. Alternatively could be run via a cron job."`
 	LogLevel         string `short:"l" long:"loglevel" description:"(optional:default [info]) set the logging level. Options are [debug, info, warn, error]."`
@@ -86,11 +96,32 @@ func NewGitParam() *GitParams {
 	if opts.CheckConfigPath == "" {
 		confDir = defaultSensuPath
 	}
+	// verify if the sensu/conf.d dir exists, fail if it doesn't
+	src, err := os.Stat(confDir)
+	if err != nil {
+		log.Fatalf("[%v] does not exist, specify the sensu/conf.d path with a '-p' flag", confDir)
+		os.Exit(1)
+	}
+	if !src.IsDir() {
+		log.Printf("[%v] is not a directory or does not exist, specify the sensu/conf.d path with a '-p' flag", confDir)
+		os.Exit(1)
+	}
+
 	var backupDir string
 	backupDir = opts.ConfigBackupPath
 	if opts.ConfigBackupPath == "" {
 		backupDir = defaultBackupPath
 	}
+	// check if the sensu conf.d.backup path exists, create it if it doesn't
+	_, err = os.Stat(backupDir)
+	if err != nil {
+		log.Debug("The sensu config.d directory was not found in the path [%s]", backupDir)
+		err := os.MkdirAll(backupDir, 0777)
+		if err != nil {
+			log.Debug("Unable to create the sensu backup path [%s] : %s", backupDir, err)
+		}
+	}
+
 	var timeInterval int
 	timeInterval = opts.TimeInterval
 	if opts.TimeInterval == 0 {
@@ -114,7 +145,7 @@ Usage:
 Application Options:
     -r, --repo=         (required) target repository url - example format: https://github.com/nerdalert/plugin-watch.git
     -t, --time=         (requiredl) time in seconds between Git repository update checks.
-    -p, --config-path=  (recommended: default: [/etc/sensu/conf.d/]) path to config files.
+    -c, --config-path=  (recommended: default: [/etc/sensu/conf.d/]) path to config files.
     -b, --backup-path=  (recommended: default: [/etc/sensu/conf.d.backups/]) path to the backup sensu 'check' config files.
     -s, --server=       (optional: default: [/etc/sensu/conf.d/]) path to config files.
     -d, --daemon=       (optional:default [true]) run as a daemon. Alternatively could be run via a cron job.

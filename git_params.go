@@ -33,6 +33,6 @@ func (g *GitParams) String() string {
 		"Polling Interval: [%d] \n"+
 		"Configuration Path: [%s] \n"+
 		"Configuration Backup Path: [%s] \n",
-		g.getRepo(), g.getTimeInterval(), g.getConfigPath(), g.getConfigPath())
+		g.getRepo(), g.getTimeInterval(), g.getConfigPath(), g.getBackupPath())
 	return s
 }

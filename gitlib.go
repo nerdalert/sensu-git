@@ -2,58 +2,59 @@ package main
 
 import (
 	"bytes"
+	log "github.com/nerdalert/sensu-git/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"os"
 	"os/exec"
 	"strings"
 )
 
-// Git Create Obj
+// Git operations object
 type GitCmd struct {
 	Dir string
 }
 
-// NewGit create default Git object
-func NewGit(dir string) *GitCmd {
+// NewGit create default Git obj
+func newGit(dir string) *GitCmd {
 	return &GitCmd{Dir: dir}
 }
 
-// Update is update command of repo
-func (g *GitCmd) Update() (cmd *exec.Cmd) {
+// Update method executes 'git pull'
+func (g *GitCmd) update() (cmd *exec.Cmd) {
 	args := []string{"pull"}
 	cmd = gitCmd(args)
 	cmd.Dir = g.Dir
 	return
 }
 
-// Update is update command of repo
-func (g *GitCmd) Fetch() (cmd *exec.Cmd) {
+// Fetch unused but added in case 'git fetch origin'
+func (g *GitCmd) fetch() (cmd *exec.Cmd) {
 	args := []string{"fetch", "origin"}
 	cmd = gitCmd(args)
 	cmd.Dir = g.Dir
 	return
 }
 
-// UpdateCurrent update the current branch
-func (g *GitCmd) UpdateCurrent() (cmd *exec.Cmd) {
+// updateCurrent update the current branch
+func (g *GitCmd) updateCurrent() (cmd *exec.Cmd) {
 	args := []string{"pull", "origin", currentBranch(g.Dir)}
 	cmd = gitCmd(args)
 	cmd.Dir = g.Dir
 	return
 }
 
-func (g *GitCmd) Clone(repo string) (cmd *exec.Cmd) {
+func (g *GitCmd) clone(repo string) (cmd *exec.Cmd) {
 	args := []string{"clone", repo, g.Dir}
 	cmd = gitCmd(args)
 	return
 }
 
-func (g *GitCmd) HasRemote() bool {
-	args := []string{"config", "--get", "remote.origin.url"}
-	cmd := gitCmd(args)
-	cmd.Dir = g.Dir
-	err := cmd.Run()
-	return err == nil
-}
+//func (g *GitCmd) HasRemote() bool {
+//	args := []string{"config", "--get", "remote.origin.url"}
+//	cmd := gitCmd(args)
+//	cmd.Dir = g.Dir
+//	err := cmd.Run()
+//	return err == nil
+//}
 
 func currentBranch(path string) string {
 	args := []string{"rev-parse", "--abbrev-ref", "HEAD"}
@@ -74,4 +75,10 @@ func gitCmd(args []string) (cmd *exec.Cmd) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return
+}
+
+func debugGitCmd(outs []byte) {
+	if len(outs) > 0 {
+		log.Debugf("Git command output: %s\n", string(outs))
+	}
 }
